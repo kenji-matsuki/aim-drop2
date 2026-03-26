@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>AIM DROP</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@300;400;700&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --panel: #12121a;
+    --border: #1e1e2e;
+    --accent: #00f0ff;
+    --accent2: #ff3c6e;
+    --purple: #c07fff;
+    --gold: #ffd700;
+    --text: #e0e0ff;
+    --muted: #555577;
+    --green: #00ff80;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(to bottom, transparent 0px, transparent 3px, rgba(0,0,0,0.07) 3px, rgba(0,0,0,0.07) 4px);
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  #app {
+    width: min(400px, 100vw);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 20px;
+    font-weight: 900;
+    letter-spacing: 4px;
+    color: var(--accent);
+    text-shadow: 0 0 20px var(--accent);
+  }
+  .stage-badge {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 10px;
+    color: var(--muted);
+    text-align: right;
+    line-height: 1.7;
+  }
+  .stage-badge span {
+    color: var(--accent);
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .status-bar { width: 100%; display: flex; gap: 8px; }
+  .stat {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 10px;
+  }
+  .stat-label { font-family: 'Orbitron', sans-serif; font-size: 9px; color: var(--muted); letter-spacing: 1px; }
+  .stat-val   { font-family: 'Orbitron', sans-serif; font-size: 20px; font-weight: 700; color: var(--text); }
+  .stat.gold .stat-val { color: var(--gold); }
+
+  .board-wrap { width: 100%; position: relative; }
+  #gameCanvas {
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    display: block;
+    box-shadow: 0 0 40px rgba(0,240,255,0.06);
+  }
+
+  .turn-row { width: 100%; display: flex; gap: 8px; }
+  .turn-item {
+    flex: 1;
+    border-radius: 5px;
+    padding: 8px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 10px;
+    letter-spacing: 1px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--muted);
+    transition: all 0.25s;
+  }
+  .turn-item.active-h { border-color: var(--accent); color: var(--accent); background: rgba(0,240,255,0.07); }
+  .turn-item.active-v { border-color: var(--purple); color: var(--purple); background: rgba(192,127,255,0.07); }
+  .turn-item.locked   { border-color: #2a4a2a; color: var(--green); background: rgba(0,255,128,0.05); }
+  .turn-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+  .turn-dot.pulse { animation: dotPulse 0.6s ease infinite alternate; }
+  @keyframes dotPulse { from { opacity:.4; transform:scale(.8); } to { opacity:1; transform:scale(1.2); } }
+
+  .btn-wrap { width: 100%; }
+  #mainBtn {
+    width: 100%;
+    padding: 20px;
+    border-radius: 8px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    cursor: pointer;
+    transition: all 0.12s;
+    background: linear-gradient(135deg, #003a5c 0%, #005a8c 100%);
+    color: var(--accent);
+    border: 2px solid var(--accent);
+    box-shadow: 0 0 30px rgba(0,240,255,0.2);
+  }
+  #mainBtn.v-mode {
+    background: linear-gradient(135deg, #3a0050 0%, #5a0078 100%);
+    color: var(--purple);
+    border-color: #9040cc;
+    box-shadow: 0 0 30px rgba(160,80,255,0.2);
+  }
+  #mainBtn:active { transform: scale(0.97); }
+  #mainBtn:disabled {
+    background: #1a1a1a; color: var(--muted);
+    border-color: var(--border); box-shadow: none; cursor: default;
+  }
+
+  .diff-row { width: 100%; display: flex; gap: 6px; flex-wrap: wrap; }
+  .diff-tag {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 9px; letter-spacing: 1px;
+    padding: 3px 8px; border-radius: 3px;
+    border: 1px solid var(--border);
+    color: var(--muted); background: var(--panel);
+    transition: all 0.3s;
+  }
+  .diff-tag.on { border-color: var(--accent2); color: var(--accent2); background: rgba(255,60,110,0.08); }
+
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.9);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 100; gap: 16px;
+    backdrop-filter: blur(6px);
+  }
+  .overlay.hidden { display: none; }
+  .ov-title { font-family: 'Orbitron', sans-serif; font-size: 34px; font-weight: 900; letter-spacing: 4px; text-align: center; }
+  .ov-title.c-start { color: var(--gold);    text-shadow: 0 0 40px var(--gold); }
+  .ov-title.c-miss  { color: var(--accent2); text-shadow: 0 0 40px var(--accent2); }
+  .ov-sub  { font-size: 13px; color: var(--muted); text-align: center; line-height: 2; white-space: pre-line; }
+  .ov-score { font-family: 'Orbitron', sans-serif; font-size: 52px; font-weight: 900; color: var(--gold); text-shadow: 0 0 30px var(--gold); }
+  .ov-btn {
+    padding: 14px 52px; background: transparent;
+    border: 2px solid var(--accent); color: var(--accent);
+    font-family: 'Orbitron', sans-serif; font-size: 13px;
+    font-weight: 700; letter-spacing: 3px; border-radius: 5px;
+    cursor: pointer; box-shadow: 0 0 30px rgba(0,240,255,0.15);
+    transition: all 0.2s; margin-top: 8px;
+  }
+  .ov-btn:hover { background: rgba(0,240,255,0.1); }
+
+  @keyframes flashOK { 0%,100%{box-shadow:none} 50%{box-shadow:0 0 70px rgba(0,255,100,.6),inset 0 0 60px rgba(0,255,100,.1)} }
+  @keyframes flashNG { 0%,100%{box-shadow:none} 50%{box-shadow:0 0 70px rgba(255,60,110,.6),inset 0 0 60px rgba(255,60,110,.1)} }
+  .fx-ok { animation: flashOK 0.4s ease; }
+  .fx-ng { animation: flashNG 0.4s ease; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <div class="title">AIM DROP</div>
+    <div class="stage-badge">STAGE <span id="stageNum">1</span></div>
+  </div>
+
+  <div class="status-bar">
+    <div class="stat"><div class="stat-label">SCORE</div><div class="stat-val" id="scoreVal">0</div></div>
+    <div class="stat gold"><div class="stat-label">BEST</div><div class="stat-val" id="bestVal">0</div></div>
+    <div class="stat"><div class="stat-label">COMBO</div><div class="stat-val" id="comboVal">0</div></div>
+  </div>
+
+  <div class="board-wrap">
+    <canvas id="gameCanvas"></canvas>
+  </div>
+
+  <div class="turn-row">
+    <div class="turn-item" id="turnH"><div class="turn-dot" id="dotH"></div><div id="labelH">HORIZONTAL</div></div>
+    <div class="turn-item" id="turnV"><div class="turn-dot" id="dotV"></div><div id="labelV">VERTICAL</div></div>
+  </div>
+
+  <div class="btn-wrap">
+    <button id="mainBtn" onclick="handleTap()">STOP</button>
+  </div>
+
+  <div class="diff-row">
+    <div class="diff-tag" id="tag1">穴：大</div>
+    <div class="diff-tag" id="tag2">穴：小</div>
+    <div class="diff-tag" id="tag3">速度UP</div>
+    <div class="diff-tag" id="tag4">照準消滅</div>
+    <div class="diff-tag" id="tag5">一方向</div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="ov-title c-start" id="ovTitle">AIM DROP</div>
+  <div class="ov-sub" id="ovSub">横の照準を止めてから\n縦の照準を止めろ\nボタンは1つ — タイミングが全て</div>
+  <div class="ov-score hidden" id="ovScore"></div>
+  <button class="ov-btn" onclick="overlayTap()">START</button>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const SIZE = 380;
+canvas.width = SIZE;
+canvas.height = SIZE;
+
+function resizeCanvas() {
+  const w = document.querySelector('.board-wrap').clientWidth;
+  canvas.style.width = w + 'px';
+  canvas.style.height = w + 'px';
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+let G = {
+  stage: 1, score: 0, best: 0, combo: 0,
+  turn: 'h',        // 'h' | 'v' | 'done'
+  hPos: 0.2, vPos: 0.3,
+  hDir: 1,  vDir: 1,
+  hFinal: null, vFinal: null,
+  phase: 'idle',    // 'idle' | 'playing' | 'judging'
+  holes: [], lastTime: 0,
+};
+
+function cfg(s) {
+  const bounce   = s <= 5;
+  const oneWay   = s >= 6;
+  let holeR, speed, visible;
+  if      (s <= 4)  { holeR = 0.13 - (s-1)*0.005; speed = 0.25 + (s-1)*0.02; visible = true;  }
+  else if (s <= 8)  { holeR = 0.10 - (s-5)*0.008; speed = 0.33 + (s-5)*0.03; visible = true;  }
+  else if (s <= 12) { holeR = 0.068;               speed = 0.45 + (s-9)*0.04; visible = true;  }
+  else              { holeR = Math.max(0.045, 0.068-(s-13)*0.002);
+                      speed = Math.min(1.2, 0.61+(s-13)*0.04);                visible = false; }
+  const holeCount = s <= 6 ? 1 : s <= 12 ? 2 : 3;
+  return { bounce, oneWay, holeR, speed, visible, holeCount };
+}
+
+function makeHoles(count, r) {
+  const holes = [], margin = r + 0.06;
+  for (let i = 0; i < count; i++) {
+    let h, t = 0;
+    do {
+      h = { x: margin + Math.random()*(1-margin*2), y: margin + Math.random()*(1-margin*2), r };
+      t++;
+    } while (t < 60 && holes.some(o => Math.hypot(o.x-h.x, o.y-h.y) < r*3));
+    holes.push(h);
+  }
+  return holes;
+}
+
+function initStage(s) {
+  const c = cfg(s);
+  G.stage = s; G.turn = 'h';
+  G.hPos = 0.05 + Math.random()*0.2;
+  G.vPos = 0.05 + Math.random()*0.2;
+  G.hDir = 1; G.vDir = Math.random() < 0.5 ? 1 : -1;
+  G.hFinal = null; G.vFinal = null;
+  G.phase = 'playing';
+  G.holes = makeHoles(c.holeCount, c.holeR);
+  refreshUI();
+}
+
+function handleTap() {
+  if (G.phase !== 'playing') return;
+  if (G.turn === 'h') {
+    G.hFinal = G.hPos; G.turn = 'v'; refreshUI();
+  } else if (G.turn === 'v') {
+    G.vFinal = G.vPos; G.turn = 'done';
+    G.phase = 'judging'; refreshUI(); judge();
+  }
+}
+
+function judge() {
+  const hit = G.holes.some(h => Math.hypot(G.hFinal - h.x, G.vFinal - h.y) <= h.r);
+  if (hit) {
+    G.combo++;
+    G.score += G.stage * 100 + G.combo * 50;
+    if (G.score > G.best) G.best = G.score;
+    canvas.classList.add('fx-ok');
+    setTimeout(() => canvas.classList.remove('fx-ok'), 400);
+    updateScoreUI();
+    setTimeout(() => initStage(G.stage + 1), 700);
+  } else {
+    G.combo = 0;
+    canvas.classList.add('fx-ng');
+    setTimeout(() => canvas.classList.remove('fx-ng'), 400);
+    setTimeout(() => showOver(), 700);
+  }
+}
+
+function showOver() {
+  G.phase = 'idle';
+  gi('ovTitle').textContent  = 'GAME OVER';
+  gi('ovTitle').className    = 'ov-title c-miss';
+  gi('ovSub').textContent    = `STAGE ${G.stage} で失敗`;
+  gi('ovScore').textContent  = G.score;
+  gi('ovScore').classList.remove('hidden');
+  gi('overlay').classList.remove('hidden');
+}
+
+function overlayTap() {
+  gi('overlay').classList.add('hidden');
+  gi('ovScore').classList.add('hidden');
+  G.score = 0; G.combo = 0;
+  initStage(1); updateScoreUI();
+}
+
+const gi = id => document.getElementById(id);
+
+function refreshUI() {
+  gi('stageNum').textContent = G.stage;
+  updateScoreUI(); updateTurnUI(); updateDiffTags();
+}
+
+function updateScoreUI() {
+  gi('scoreVal').textContent = G.score;
+  gi('bestVal').textContent  = G.best;
+  gi('comboVal').textContent = G.combo;
+}
+
+function updateTurnUI() {
+  const btn = gi('mainBtn');
+  const th = gi('turnH'), tv = gi('turnV');
+  const dh = gi('dotH'),  dv = gi('dotV');
+  th.className = 'turn-item'; tv.className = 'turn-item';
+  dh.classList.remove('pulse'); dv.classList.remove('pulse');
+
+  if (G.turn === 'h') {
+    th.classList.add('active-h'); dh.classList.add('pulse');
+    gi('labelH').textContent = '▶ MOVING';
+    gi('labelV').textContent = 'VERTICAL';
+    btn.textContent = '▶ 横を止める';
+    btn.className = ''; btn.disabled = false;
+  } else if (G.turn === 'v') {
+    th.classList.add('locked');
+    gi('labelH').textContent = '✓ LOCKED';
+    tv.classList.add('active-v'); dv.classList.add('pulse');
+    gi('labelV').textContent = '▲ MOVING';
+    btn.textContent = '▲ 縦を止める';
+    btn.className = 'v-mode'; btn.disabled = false;
+  } else {
+    th.classList.add('locked'); tv.classList.add('locked');
+    gi('labelH').textContent = '✓ LOCKED';
+    gi('labelV').textContent = '✓ LOCKED';
+    btn.textContent = '判定中...'; btn.disabled = true;
+  }
+}
+
+function updateDiffTags() {
+  const s = G.stage;
+  [
+    ['tag1', s <= 4],
+    ['tag2', s >= 5 && s <= 12],
+    ['tag3', s >= 9],
+    ['tag4', s >= 13],
+    ['tag5', s >= 6],
+  ].forEach(([id, on]) => gi(id).className = 'diff-tag' + (on ? ' on' : ''));
+}
+
+// ===== DRAW =====
+function draw(now) {
+  const c = cfg(G.stage);
+  const dt = Math.min((now - G.lastTime) / 1000, 0.05);
+  G.lastTime = now;
+
+  if (G.phase === 'playing') {
+    const spd = c.speed;
+    if (G.turn === 'h') {
+      G.hPos += G.hDir * spd * dt;
+      if (c.bounce) {
+        if (G.hPos >= 1) { G.hPos = 1; G.hDir = -1; }
+        if (G.hPos <= 0) { G.hPos = 0; G.hDir =  1; }
+      } else {
+        if (G.hPos >= 1) G.hPos = 0;
+        if (G.hPos <  0) G.hPos = 1;
+      }
+    } else if (G.turn === 'v') {
+      G.vPos += G.vDir * spd * dt;
+      if (c.bounce) {
+        if (G.vPos >= 1) { G.vPos = 1; G.vDir = -1; }
+        if (G.vPos <= 0) { G.vPos = 0; G.vDir =  1; }
+      } else {
+        if (G.vPos >= 1) G.vPos = 0;
+        if (G.vPos <  0) G.vPos = 1;
+      }
+    }
+  }
+
+  const W = SIZE, H = SIZE;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0d0d1a';
+  ctx.fillRect(0, 0, W, H);
+
+  // grid dots
+  ctx.fillStyle = 'rgba(255,255,255,0.035)';
+  for (let x = 24; x < W; x += 24)
+    for (let y = 24; y < H; y += 24) {
+      ctx.beginPath(); ctx.arc(x, y, 1, 0, Math.PI*2); ctx.fill();
+    }
+
+  // holes
+  for (const h of G.holes) {
+    const hx = h.x*W, hy = h.y*H, hr = h.r*W;
+    const grd = ctx.createRadialGradient(hx, hy, 0, hx, hy, hr*2.2);
+    grd.addColorStop(0, 'rgba(0,240,255,0.10)');
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.arc(hx, hy, hr*2.2, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(hx, hy, hr, 0, Math.PI*2);
+    ctx.fillStyle = '#000008'; ctx.fill();
+    ctx.strokeStyle = '#00e8f5'; ctx.lineWidth = 1.8; ctx.stroke();
+    ctx.beginPath(); ctx.arc(hx, hy, hr*0.45, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(0,240,255,0.25)'; ctx.lineWidth = 1; ctx.stroke();
+  }
+
+  // lines
+  const hx  = (G.hFinal !== null ? G.hFinal : G.hPos) * W;
+  const vy  = (G.vFinal !== null ? G.vFinal : G.vPos) * H;
+  const showLines = c.visible || G.phase === 'judging';
+
+  if (showLines) {
+    // horizontal (vertical line on canvas = x position)
+    const hLocked = G.hFinal !== null;
+    if (hLocked || G.turn === 'h') {
+      ctx.strokeStyle = hLocked ? 'rgba(0,240,255,0.95)' : 'rgba(0,200,255,0.55)';
+      ctx.lineWidth = hLocked ? 2 : 1.5;
+      ctx.setLineDash(hLocked ? [] : [5,5]);
+      ctx.beginPath(); ctx.moveTo(hx, 0); ctx.lineTo(hx, H); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // vertical (horizontal line on canvas = y position)
+    const vLocked = G.vFinal !== null;
+    if (vLocked || G.turn === 'v') {
+      ctx.strokeStyle = vLocked ? 'rgba(200,100,255,0.95)' : 'rgba(170,80,255,0.55)';
+      ctx.lineWidth = vLocked ? 2 : 1.5;
+      ctx.setLineDash(vLocked ? [] : [5,5]);
+      ctx.beginPath(); ctx.moveTo(0, vy); ctx.lineTo(W, vy); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // crosshair dot
+    if (hLocked && vLocked) {
+      ctx.beginPath(); ctx.arc(hx, vy, 7, 0, Math.PI*2);
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1.5; ctx.stroke();
+    } else if (G.turn === 'v' && hLocked) {
+      ctx.beginPath(); ctx.arc(hx, vy, 5, 0, Math.PI*2);
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1.2; ctx.stroke();
+    }
+  } else if (G.phase === 'playing') {
+    // Subtle ambient pulse
+    const pulse = (Math.sin(now * 0.002) + 1) * 0.5;
+    ctx.fillStyle = `rgba(0,240,255,${0.02 + pulse*0.015})`;
+    ctx.fillRect(0, 0, W, H);
+
+    const MARKER_LEN = 18;  // length of edge tick
+    const MARKER_W   = 3;   // thickness
+    const MARKER_GAP = 4;   // inset from edge
+
+    // --- Horizontal line marker (moves along X axis) ---
+    // shown on LEFT and RIGHT edges as a horizontal tick at hx
+    if (G.turn === 'h') {
+      const mx = G.hPos * W;
+      // glow gradient helper
+      const drawHMarker = (edgeX, dir) => {
+        // dir: +1 = pointing inward (right), -1 = pointing inward (left)
+        const grad = ctx.createLinearGradient(edgeX, 0, edgeX + dir * MARKER_LEN, 0);
+        grad.addColorStop(0,   'rgba(0,240,255,0.95)');
+        grad.addColorStop(1,   'rgba(0,240,255,0)');
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = MARKER_W;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(edgeX + MARKER_GAP * dir, mx);
+        ctx.lineTo(edgeX + (MARKER_GAP + MARKER_LEN) * dir, mx);
+        ctx.stroke();
+        // small perpendicular cap line
+        ctx.strokeStyle = 'rgba(0,240,255,0.7)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(edgeX + MARKER_GAP * dir, mx - 6);
+        ctx.lineTo(edgeX + MARKER_GAP * dir, mx + 6);
+        ctx.stroke();
+      };
+      drawHMarker(0,  +1);   // left edge
+      drawHMarker(W,  -1);   // right edge
+    }
+
+    // --- Vertical line marker (moves along Y axis) ---
+    // shown on TOP and BOTTOM edges as a vertical tick at vy
+    if (G.turn === 'v') {
+      const my = G.vPos * H;
+      // also draw locked H marker as a static dim tick on both sides
+      if (G.hFinal !== null) {
+        const lx = G.hFinal * W;
+        ctx.strokeStyle = 'rgba(0,240,255,0.35)';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        // left
+        ctx.beginPath(); ctx.moveTo(MARKER_GAP, lx); ctx.lineTo(MARKER_GAP + MARKER_LEN, lx); ctx.stroke();
+        // right
+        ctx.beginPath(); ctx.moveTo(W - MARKER_GAP, lx); ctx.lineTo(W - MARKER_GAP - MARKER_LEN, lx); ctx.stroke();
+      }
+
+      const drawVMarker = (edgeY, dir) => {
+        const grad = ctx.createLinearGradient(0, edgeY, 0, edgeY + dir * MARKER_LEN);
+        grad.addColorStop(0,   'rgba(192,127,255,0.95)');
+        grad.addColorStop(1,   'rgba(192,127,255,0)');
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = MARKER_W;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(my, edgeY + MARKER_GAP * dir);
+        ctx.lineTo(my, edgeY + (MARKER_GAP + MARKER_LEN) * dir);
+        ctx.stroke();
+        // small perpendicular cap
+        ctx.strokeStyle = 'rgba(192,127,255,0.7)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(my - 6, edgeY + MARKER_GAP * dir);
+        ctx.lineTo(my + 6, edgeY + MARKER_GAP * dir);
+        ctx.stroke();
+      };
+      drawVMarker(0,  +1);   // top edge
+      drawVMarker(H,  -1);   // bottom edge
+    }
+  }
+
+  // result markers
+  if (G.phase === 'judging' && G.hFinal !== null && G.vFinal !== null) {
+    const fx = G.hFinal * W, fy = G.vFinal * H;
+    const hit = G.holes.some(h => Math.hypot(G.hFinal-h.x, G.vFinal-h.y) <= h.r);
+    ctx.font = 'bold 13px Orbitron, monospace';
+    ctx.textAlign = 'center';
+    if (hit) {
+      ctx.strokeStyle = 'rgba(0,255,100,0.9)'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(fx, fy, 14, 0, Math.PI*2); ctx.stroke();
+      ctx.fillStyle = 'rgba(0,255,100,0.12)';
+      ctx.beginPath(); ctx.arc(fx, fy, 14, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#00ff64'; ctx.fillText('HIT!', fx, fy-22);
+    } else {
+      ctx.strokeStyle = 'rgba(255,60,110,0.9)'; ctx.lineWidth = 3;
+      const d = 12;
+      ctx.beginPath();
+      ctx.moveTo(fx-d,fy-d); ctx.lineTo(fx+d,fy+d);
+      ctx.moveTo(fx+d,fy-d); ctx.lineTo(fx-d,fy+d);
+      ctx.stroke();
+      ctx.fillStyle = '#ff3c6e'; ctx.fillText('MISS', fx, fy-22);
+    }
+  }
+
+  requestAnimationFrame(draw);
+}
+
+requestAnimationFrame(draw);
+initStage(1);
+gi('ovTitle').textContent = 'AIM DROP';
+gi('ovTitle').className = 'ov-title c-start';
+gi('ovSub').textContent = '横の照準を止めてから\n縦の照準を止めろ\nボタンは1つ — タイミングが全て';
+</script>
+</body>
+</html>
